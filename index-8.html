@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>NICE BUTT</title>
+<meta name="description" content="Wir lieben Komplimente.">
+<meta name="theme-color" content="#111111">
+<meta property="og:title" content="NICE BUTT">
+<meta property="og:description" content="Wir lieben Komplimente.">
+<meta property="og:image" content="og.png">
+<meta property="og:type" content="website">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=clash-display@700&display=swap">
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;touch-action:none}
+body{font-family:'Clash Display','Helvetica Neue',Helvetica,Arial,sans-serif;cursor:pointer;user-select:none;-webkit-user-select:none}
+
+#stage{
+  position:fixed;inset:0;
+  display:flex;align-items:center;justify-content:center;
+  transition:background-color 0.7s cubic-bezier(.4,0,.2,1);
+}
+
+#card{
+  position:absolute;inset:0;
+  display:flex;
+  transition:opacity 0.3s ease;
+}
+#card.out{opacity:0}
+
+#tap-hint{
+  position:fixed;bottom:22px;right:24px;
+  font-size:10px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;
+  opacity:0;
+  transition:opacity 0.5s ease;
+  mix-blend-mode:difference;
+  color:white;
+  pointer-events:none;
+}
+#tap-hint.visible{opacity:0.3}
+
+#counter{
+  position:fixed;bottom:22px;left:24px;
+  font-size:10px;font-weight:700;letter-spacing:0.15em;
+  opacity:0.2;
+  mix-blend-mode:difference;
+  color:white;
+  pointer-events:none;
+}
+</style>
+</head>
+<body>
+
+<div id="stage">
+  <div id="card"></div>
+</div>
+<div id="tap-hint">tippen</div>
+<div id="counter"></div>
+
+<script>
+// ─── TRANSLATIONS ───────────────────────────────────────────────────────────
+const lang = (()=>{
+  const l = (navigator.language||'en').toLowerCase().slice(0,2);
+  const map = {de:0,en:1,fr:2,it:3,es:4,pt:5,nl:6,sv:7,fi:8,pl:9,cs:10,sk:11,hu:12,ro:13,hr:14,sl:15};
+  return map[l]!==undefined ? map[l] : 1;
+})();
+
+// Each compliment: [de, en, fr, it, es, pt, nl, sv, fi, pl, cs, sk, hu, ro, hr, sl]
+const C = [
+  ["Du siehst heute gut aus","You look good today","Tu es beau aujourd'hui","Hai un bell'aspetto oggi","Hoy te ves muy bien","Você está ótimo hoje","Je ziet er goed uit vandaag","Du ser bra ut idag","Näytät hyvältä tänään","Dziś świetnie wyglądasz","Dnes vypadáš skvěle","Dnes vyzeráš skvele","Ma jól nézel ki","Arăți bine azi","Danas izgledaš sjajno","Danes izgledaš odlično"],
+  ["Dein Lachen macht Räume größer","Your laugh makes rooms bigger","Ton rire agrandit les pièces","La tua risata ingrandisce le stanze","Tu risa hace los espacios más grandes","Seu riso enche os espaços","Je lach maakt ruimtes groter","Ditt skratt fyller rum","Naurusisi täyttää huoneet","Twój śmiech powiększa przestrzeń","Tvůj smích zvětšuje místnosti","Tvoj smiech zväčšuje miestnosti","A nevetésed betölt minden teret","Râsul tău umple spațiile","Tvoj smijeh ispunjava prostore","Tvoj smeh napolni prostore"],
+  ["Du hast mehr geschafft als du weißt","You've done more than you know","Tu as accompli plus que tu ne le sais","Hai fatto più di quanto pensi","Has logrado más de lo que crees","Você realizou mais do que imagina","Je hebt meer bereikt dan je weet","Du har åstadkommit mer än du vet","Olet saavuttanut enemmän kuin tiedät","Zrobiłeś więcej niż myślisz","Dokázal jsi více, než víš","Dokázal si viac, ako vieš","Többet értél el, mint gondolod","Ai realizat mai mult decât știi","Postigao si više nego što znaš","Dosegel si več kot veš"],
+  ["Nice butt","Nice butt","Joli cul","Bel sedere","Lindo trasero","Bunda boa","Lekkere kont","Fin rumpa","Kiva peppu","Ładny tyłek","Pěkný zadek","Pekný zadok","Szép fenék","Fund frumos","Lijepa guza","Lepo zadnje"],
+  ["Du bist jemand, bei dem man sich nicht verstellt","You're someone people don't pretend around","Tu es quelqu'un devant qui on ne joue pas la comédie","Sei qualcuno davanti al quale non ci si finge","Eres alguien ante quien la gente no finge","Você é alguém com quem as pessoas são genuínas","Bij jou hoeft niemand te doen alsof","Hos dig behöver ingen låtsas","Sinun seurassasi ei tarvitse esittää","Przy tobie nikt nie udaje","U tebe nikdo nemusí předstírat","Pri tebe nikto nemusí predstierať","Veled senki sem játszik szerepet","Cu tine nimeni nu se preface","Uz tebe nitko se ne pretvara","Pri tebi se nihče ne pretvarja"],
+  ["Dein Stil hat was. Schwer zu kopieren","Your style has something. Hard to copy","Ton style a quelque chose. Difficile à copier","Il tuo stile ha qualcosa. Difficile da copiare","Tu estilo tiene algo. Difícil de copiar","Seu estilo tem algo. Difícil de copiar","Jouw stijl heeft iets. Moeilijk te kopiëren","Din stil har något. Svårt att kopiera","Sinulla on tyyli. Vaikea kopioida","Twój styl ma coś. Trudno skopiować","Tvůj styl má něco. Těžko kopírovatelné","Tvoj štýl má niečo. Ťažko kopírovateľné","A stílusodnak van valami. Nehéz másolni","Stilul tău are ceva. Greu de copiat","Tvoj stil ima nešto. Teško za kopirati","Tvoj slog ima nekaj. Težko za kopirati"],
+  ["Du hast ein Gespür dafür, wann jemand Abstand braucht","You know when someone needs space","Tu sais quand quelqu'un a besoin d'espace","Sai quando qualcuno ha bisogno di spazio","Sabes cuándo alguien necesita espacio","Você sabe quando alguém precisa de espaço","Je weet wanneer iemand ruimte nodig heeft","Du vet när någon behöver utrymme","Tiedät milloin joku tarvitsee tilaa","Wiesz kiedy ktoś potrzebuje przestrzeni","Víš, kdy někdo potřebuje prostor","Vieš, kedy niekto potrebuje priestor","Tudod, mikor kell valakit hagyni","Știi când cineva are nevoie de spațiu","Znaš kada nekome treba prostora","Veš, kdaj nekdo potrebuje prostor"],
+  ["Die Art wie du gehst hat Haltung","The way you walk has posture","Ta façon de marcher a de l'allure","Il tuo modo di camminare ha portamento","Tu forma de caminar tiene porte","Seu jeito de andar tem postura","De manier waarop je loopt heeft houding","Sättet du går på har hållning","Kävelytavassasi on ryhtisyyttä","Twój sposób chodzenia ma postawę","Způsob, jakým chodíš, má postoj","Spôsob, akým chodíš, má postoj","A járásodnak van tartása","Felul în care mergi are ținută","Način na koji hodaš ima stav","Način hoje ima držo"],
+  ["Du erinnerst dich an Geburtstage","You remember birthdays","Tu te souviens des anniversaires","Ricordi i compleanni","Recuerdas los cumpleaños","Você lembra dos aniversários","Je onthoudt verjaardagen","Du kommer ihåg födelsedagar","Muistat syntymäpäivät","Pamiętasz urodziny","Pamatuješ narozeniny","Pamätáš si narodeniny","Megemlékezel a születésnapokról","Îți amintești zilele de naștere","Pamtiš rođendane","Spomniš si rojstne dneve"],
+  ["Du bist lustig auf eine Art, die nicht auf Kosten anderer geht","You're funny in a way that doesn't come at others' expense","Tu es drôle d'une façon qui ne blesse personne","Sei divertente in un modo che non va a spese degli altri","Eres gracioso de una manera que no perjudica a nadie","Você é engraçado de um jeito que não machuca ninguém","Je bent grappig op een manier die niemand kwetst","Du är rolig på ett sätt som inte skadar någon","Olet hauska tavalla, joka ei tule muiden kustannuksella","Jesteś zabawny w sposób, który nie odbywa się kosztem innych","Jsi vtipný způsobem, který nejde na úkor ostatních","Si vtipný spôsobom, ktorý nejde na úkor iných","Olyan módon vagy vicces, hogy az nem mások rovására megy","Ești amuzant într-un mod care nu dăunează altora","Zabavan si na način koji ne ide na tuđi račun","Zabaven si na način, ki ne gre na račun drugih"],
+  ["Dein Gesicht im Ruhezustand sieht freundlich aus","Your resting face looks friendly","Ton visage au repos semble accueillant","Il tuo viso a riposo sembra amichevole","Tu cara en reposo parece amigable","Seu rosto em repouso parece amigável","Je rustige gezicht ziet er vriendelijk uit","Ditt viloansikte ser vänligt ut","Lepokasvosi näyttävät ystävällisiltä","Twoja twarz w spoczynku wygląda przyjaźnie","Tvůj klidný výraz vypadá přátelsky","Tvoja pokojná tvár vyzerá priateľsky","Nyugodt arckifejezésed barátságos","Fața ta în repaus arată prietenoasă","Tvoje mirno lice izgleda prijateljski","Tvoj mirni izraz je prijazen"],
+  ["Du hast ein gutes Herz. Man merkt das, auch wenn du nichts sagst","You have a good heart. It shows, even when you say nothing","Tu as bon cœur. Ça se voit, même quand tu ne dis rien","Hai un buon cuore. Si vede, anche quando non dici nulla","Tienes buen corazón. Se nota, aunque no digas nada","Você tem bom coração. Dá para ver, mesmo em silêncio","Je hebt een goed hart. Dat merk je, ook als je niets zegt","Du har ett gott hjärta. Det märks, även när du inte säger något","Sinulla on hyvä sydän. Se näkyy, vaikka et sanoisi mitään","Masz dobre serce. Widać to, nawet kiedy nic nie mówisz","Máš dobré srdce. Je to vidět, i když nic neříkáš","Máš dobré srdce. Vidieť to, aj keď nič nehovoríš","Jó szíved van. Látszik, még ha nem is szólsz","Ai o inimă bună. Se vede, chiar și când nu spui nimic","Imaš dobro srce. Vidi se, čak i kad ništa ne govoriš","Imaš dobro srce. Videti je, tudi ko ne govoriš nič"],
+  ["Du bist jemand, dem man sein Handy zum Entsperren geben würde","You're someone people would hand their phone to unlock","Tu es quelqu'un à qui on donnerait son téléphone à déverrouiller","Sei qualcuno a cui si darebbe il telefono da sbloccare","Eres alguien a quien le darías tu teléfono para desbloquear","Você é alguém a quem dariam o celular para desbloquear","Jij bent iemand aan wie je je telefoon zou geven om te ontgrendelen","Du är någon man skulle ge sin telefon att låsa upp","Sinulle voisi antaa puhelimen auki","Jesteś osobą, której można dać telefon do odblokowania","Jsi někdo, komu by někdo dal telefon na odemčení","Si niekto, komu by dali telefón na odomknutie","Te vagy az, akinek odaadnák a telefont feloldani","Ești cineva căruia i-ai da telefonul să-l deblocheze","Ti si netko kome bi dali telefon za otključavanje","Ti si nekdo, ki bi mu dali telefon za odklep"],
+  ["Dein Händedruck ist genau richtig","Your handshake is just right","Ta poignée de main est parfaite","La tua stretta di mano è perfetta","Tu apretón de manos es perfecto","Seu aperto de mão é perfeito","Je handdruk is precies goed","Ditt handslag är precis rätt","Kättelesi on juuri oikea","Twój uścisk dłoni jest idealny","Tvůj stisk ruky je přesně správný","Tvoje podanie ruky je presne správne","A kézfogásod épp megfelelő","Strângerea ta de mână e perfectă","Tvoj stisak ruke je savršen","Tvoj rokovanje je ravno pravo"],
+  ["Du machst dir Gedanken. Mehr als du zugibst","You think deeply. More than you admit","Tu réfléchis profondément. Plus que tu ne l'admets","Ci pensi profondamente. Più di quanto ammetti","Piensas profundamente. Más de lo que admites","Você pensa profundamente. Mais do que admite","Je denkt diep na. Meer dan je toegeeft","Du tänker djupt. Mer än du erkänner","Ajattelet syvällisesti. Enemmän kuin myönnät","Myślisz głęboko. Bardziej niż przyznajesz","Přemýšlíš hluboce. Více než připouštíš","Premýšľaš hlboko. Viac ako pripúšťaš","Mélyen gondolkodsz. Jobban, mint bevallod","Gândești profund. Mai mult decât recunoști","Razmišljaš duboko. Više nego što priznaješ","Razmišljaš globoko. Bolj kot priznaš"],
+  ["Du hast Geschmack. Nicht aufdringlich, aber erkennbar","You have taste. Not loud, but recognizable","Tu as du goût. Pas tapageur, mais reconnaissable","Hai gusto. Non vistoso, ma riconoscibile","Tienes gusto. No llamativo, pero reconocible","Você tem gosto. Não chamativo, mas reconhecível","Je hebt smaak. Niet opdringerig, maar herkenbaar","Du har smak. Inte påträngande, men igenkännbar","Sinulla on maku. Ei silmiinpistävä, mutta tunnistettava","Masz gust. Nie nachalny, ale rozpoznawalny","Máš vkus. Není hlasitý, ale rozpoznatelný","Máš vkus. Nie krikľavý, ale rozoznateľný","Van ízlésed. Nem hangos, de felismerhető","Ai gust. Nu țipător, dar recognoscibil","Imaš ukus. Nije upadljiv, ali prepoznatljiv","Imaš okus. Ni glasen, a prepoznaven"],
+  ["Wenn du etwas versprichst, hältst du es","When you make a promise, you keep it","Quand tu fais une promesse, tu la tiens","Quando fai una promessa, la mantieni","Cuando haces una promesa, la cumples","Quando você faz uma promessa, a cumpre","Als je iets belooft, houd je je eraan","När du lovar något, håller du det","Kun lupaat jotain, pidät sen","Kiedy coś obiecujesz, dotrzymujesz","Když něco slíbíš, splníš to","Keď niečo sľúbiš, splníš to","Ha ígérsz valamit, megtartod","Când faci o promisiune, o respecți","Kad nešto obećaš, držiš to","Ko nekaj obljubiš, to drži"],
+  ["Deine Stimme ist angenehm. Das ist unterschätzter als du denkst","Your voice is pleasant. More underrated than you think","Ta voix est agréable. Plus sous-estimée que tu ne le penses","La tua voce è piacevole. Più sottovalutata di quanto pensi","Tu voz es agradable. Más infravalorada de lo que crees","Sua voz é agradável. Mais subestimada do que você pensa","Je stem is aangenaam. Meer onderschat dan je denkt","Din röst är behaglig. Mer underskattad än du tror","Äänesi on miellyttävä. Aliarvioitumpi kuin luulet","Twój głos jest przyjemny. Bardziej niedoceniany niż myślisz","Tvůj hlas je příjemný. Více podceňovaný, než si myslíš","Tvoj hlas je príjemný. Viac nedoceňovaný, ako si myslíš","Kellemes a hangod. Alábecsültebb, mint gondolod","Vocea ta e plăcută. Mai subestimată decât crezi","Tvoj glas je ugodan. Više podcijenjen nego što misliš","Tvoj glas je prijeten. Bolj podcenjen kot misliš"],
+  ["Du hast dich verändert. Zum Besseren","You've changed. For the better","Tu as changé. En mieux","Sei cambiato. In meglio","Has cambiado. Para mejor","Você mudou. Para melhor","Je bent veranderd. Ten goede","Du har förändrats. Till det bättre","Olet muuttunut. Parempaan suuntaan","Zmieniłeś się. Na lepsze","Změnil ses. K lepšímu","Zmenil si sa. K lepšiemu","Megváltozott. Jobb irányba","Te-ai schimbat. În bine","Promijenio si se. Na bolje","Spremenil si se. Na bolje"],
+  ["Du bist gut im Zuhören. Nicht nur warten bis du dran bist","You're good at listening. Not just waiting for your turn","Tu sais écouter. Pas juste attendre ton tour","Sai ascoltare. Non aspetti solo il tuo turno","Sabes escuchar. No solo esperar tu turno","Você sabe ouvir. Não apenas esperar sua vez","Je bent goed in luisteren. Niet alleen wachten op je beurt","Du är bra på att lyssna. Inte bara vänta på din tur","Olet hyvä kuuntelemaan. Et vain odota omaa vuoroasi","Dobrze słuchasz. Nie tylko czekasz na swoją kolej","Umíš naslouchat. Nečekáš jen na svůj čas","Umieš počúvať. Nečakáš len na svoju chvíľu","Jól hallgatsz. Nem csak várod, hogy te kerülj sorra","Ești bun la ascultat. Nu doar aștepți să-ți vină rândul","Dobro slušaš. Ne čekaš samo na svoj red","Dobro poslušaš. Ne čakaš samo na svojo priložnost"],
+  ["Du siehst aus wie jemand der guten Kaffee macht","You look like someone who makes good coffee","Tu ressembles à quelqu'un qui fait un bon café","Sembri qualcuno che fa un buon caffè","Pareces alguien que hace un buen café","Você parece alguém que faz um bom café","Je ziet eruit als iemand die goede koffie maakt","Du ser ut som någon som gör gott kaffe","Näytät siltä kuin tekisit hyvää kahvia","Wyglądasz jak ktoś, kto robi dobrą kawę","Vypadáš jako někdo, kdo dělá dobrou kávu","Vyzeráš ako niekto, kto robí dobrú kávu","Úgy nézel ki, mint aki jó kávét csinál","Arăți ca cineva care face cafea bună","Izgledaš kao netko tko pravi dobru kavu","Izgledaš kot nekdo, ki naredi dobro kavo"],
+  ["Du bemerkst Details, die anderen entgehen","You notice details others miss","Tu remarques des détails que les autres ratent","Noti dettagli che gli altri perdono","Notas detalles que otros pasan por alto","Você nota detalhes que os outros perdem","Jij merkt details op die anderen ontgaan","Du lägger märke till detaljer andra missar","Huomaat yksityiskohdat, jotka muut jäävät huomaamatta","Zauważasz szczegóły, które umykają innym","Všímáš si detailů, které ostatní přehlédnou","Všímaš si detailov, ktoré ostatní prehliadnu","Olyan részleteket veszel észre, amiket mások nem","Observi detalii pe care alții le ratează","Primjećuješ detalje koje drugi propuštaju","Opaziš podrobnosti, ki jih drugi zamudijo"],
+  ["Dein Bauch ist in Ordnung, egal was er gerade tut","Your belly is fine, whatever it's doing right now","Ton ventre est bien, quoi qu'il fasse en ce moment","La tua pancia va bene, qualunque cosa stia facendo","Tu barriga está bien, haga lo que haga ahora mismo","Sua barriga está ótima, faça o que fizer","Jouw buik is prima, wat hij ook doet","Din mage är okej, vad den än gör","Vatsasi on kunnossa, mitä ikinä se tekeekin","Twój brzuch jest w porządku, cokolwiek teraz robi","Tvoje břicho je v pořádku, ať dělá cokoliv","Tvoje brucho je v poriadku, čo quiera teraz robí","A hasad rendben van, bármit is csinál","Burta ta e bine, indiferent ce face","Tvoj trbuh je u redu, šta god da radi","Tvoj trebuh je v redu, karkoli že počne"],
+  ["Du nimmst dir Zeit für Leute. Das merken die","You take time for people. They notice","Tu prends le temps pour les gens. Ils s'en souviennent","Ti prendi tempo per le persone. Lo notano","Te tomas tiempo para la gente. Ellos lo notan","Você tem tempo para as pessoas. Elas percebem","Je neemt de tijd voor mensen. Die merken het","Du tar dig tid för folk. De märker det","Otat aikaa ihmisille. He huomaavat sen","Poświęcasz czas ludziom. Oni to zauważają","Bereš si čas na lidi. To si všimnou","Bereš si čas na ľudí. To si všimnú","Időt szánsz az emberekre. Ők ezt észreveszik","Îți faci timp pentru oameni. Ei observă","Uzimas si vremena za ljude. Oni to primjećuju","Vzameš si čas za ljudi. To opazijo"],
+  ["Du hast einen Blick der beruhigt","You have a look that calms people","Ton regard apaise les gens","Il tuo sguardo calma le persone","Tu mirada calma a la gente","Seu olhar acalma as pessoas","Je blik stelt mensen gerust","Din blick lugnar folk","Katseesi rauhoittaa ihmisiä","Twoje spojrzenie uspokaja","Tvůj pohled uklidňuje","Tvoj pohľad upokojuje","A tekinteted megnyugtat","Privirea ta calmează","Tvoj pogled smiruje","Tvoj pogled pomirja"],
+  ["Deine Hände sehen nach Arbeit aus. Das ist ein Kompliment","Your hands look like they've worked. That's a compliment","Tes mains ont l'air d'avoir travaillé. C'est un compliment","Le tue mani sembrano aver lavorato. È un complimento","Tus manos parecen haber trabajado. Es un cumplido","Suas mãos parecem ter trabalhado. É um elogio","Je handen zien eruit alsof ze hebben gewerkt. Dat is een compliment","Dina händer ser ut att ha arbetat. Det är en komplimang","Kätesi näyttävät työn jäljiltä. Se on kohtelias","Twoje ręce wyglądają, jakby pracowały. To komplement","Tvoje ruce vypadají, že pracovaly. To je kompliment","Tvoje ruky vyzerajú, akoby pracovali. To je kompliment","A kezeid olyanok, mintha dolgoztak volna. Ez bók","Mâinile tale arată că au muncit. E un compliment","Tvoje ruke izgledaju kao da su radile. To je kompliment","Tvoje roke izgledajo kot da so delale. To je kompliment"],
+  ["Du kannst schweigen ohne dass es unangenehm wird","You can be silent without it getting uncomfortable","Tu sais te taire sans que ça devienne gênant","Sai stare in silenzio senza che diventi imbarazzante","Puedes estar en silencio sin que se vuelva incómodo","Você pode ficar em silêncio sem que fique desconfortável","Je kunt zwijgen zonder dat het ongemakkelijk wordt","Du kan vara tyst utan att det blir obekvämt","Voit olla hiljaa ilman että se muuttuu epämukavaksi","Możesz milczeć bez dyskomfortu","Umíš mlčet, aniž by to bylo nepříjemné","Vieš mlčať, aby to nebolo nepríjemné","Tudsz csendben lenni anélkül, hogy kényelmetlenné válna","Poți fi în tăcere fără să devină incomod","Možeš šutjeti bez nelagode","Znaš molčati, ne da bi bilo neprijetno"],
+  ["Du weißt wann ein Witz zu viel ist","You know when a joke is one too many","Tu sais quand une blague est de trop","Sai quando una battuta è una di troppo","Sabes cuándo un chiste es demasiado","Você sabe quando uma piada é demais","Je weet wanneer een grap te veel is","Du vet när ett skämt är ett för mycket","Tiedät milloin vitsi on liikaa","Wiesz kiedy żart jest za dużo","Víš, kdy je vtip jeden navíc","Vieš, kedy je vtip jeden navyše","Tudod, mikor egy vicc már sok","Știi când o glumă e una în plus","Znaš kad je šala jedna previše","Veš, kdaj je šala ena preveč"],
+  ["Du trägst deine Geschichte ohne Erklärung","You carry your story without explanation","Tu portes ton histoire sans explication","Porti la tua storia senza spiegazioni","Llevas tu historia sin explicaciones","Você carrega sua história sem explicações","Je draagt je verhaal zonder uitleg","Du bär din historia utan förklaring","Kannat tarinaasi ilman selityksiä","Nosisz swoją historię bez wyjaśnień","Neseš svůj příběh bez vysvětlování","Nesieš svoj príbeh bez vysvetľovania","A történetedet magyarázat nélkül hordozod","Îți porți povestea fără explicații","Nosiš svoju priču bez objašnjenja","Nosiš svojo zgodbo brez razlage"],
+  ["Deine Art zu lachen ist ansteckend","The way you laugh is contagious","Ta façon de rire est contagieuse","Il tuo modo di ridere è contagioso","Tu forma de reír es contagiosa","Seu jeito de rir é contagiante","De manier waarop je lacht is aanstekelijk","Sättet du skrattar på är smittsamt","Tapasi nauraa on tarttuva","Twój śmiech jest zaraźliwy","Tvůj smích je nakažlivý","Tvoj smiech je nákazlivý","A nevetésed ragályos","Modul în care râzi e contagios","Način na koji se smiješ je zarazan","Način, kako se smeješ, je nalezljiv"],
+  ["Du bist mutiger als du denkst","You're braver than you think","Tu es plus courageux que tu ne le crois","Sei più coraggioso di quanto pensi","Eres más valiente de lo que crees","Você é mais corajoso do que pensa","Je bent moediger dan je denkt","Du är modigare än du tror","Olet rohkeampi kuin luulet","Jesteś odważniejszy niż myślisz","Jsi odvážnější, než si myslíš","Si odvážnejší, ako si myslíš","Bátorabb vagy, mint gondolod","Ești mai curajos decât crezi","Hrabriji si nego što misliš","Si pogumnejši kot misliš"],
+  ["Du hast gute Beine","You have good legs","Tu as de belles jambes","Hai belle gambe","Tienes buenas piernas","Você tem boas pernas","Je hebt mooie benen","Du har fina ben","Sinulla on hyvät jalat","Masz ładne nogi","Máš hezké nohy","Máš pekné nohy","Szép lábaid vannak","Ai picioare frumoase","Imaš lijepe noge","Imaš lepe noge"],
+  ["Du gibst mehr als du nimmst. Meistens","You give more than you take. Mostly","Tu donnes plus que tu ne prends. La plupart du temps","Dai più di quanto prendi. Quasi sempre","Das más de lo que tomas. La mayoría de las veces","Você dá mais do que toma. Na maior parte do tempo","Je geeft meer dan je neemt. Meestal","Du ger mer än du tar. Oftast","Annat enemmän kuin otat. Useimmiten","Dajesz więcej niż bierzesz. Przeważnie","Dáváš více než bereš. Většinou","Dávaš viac ako bereš. Väčšinou","Többet adsz, mint amennyit veszel. Többnyire","Dai mai mult decât iei. De obicei","Daješ više nego što uzimeš. Uglavnom","Daješ več kot jemlješ. Večinoma"],
+  ["Du wärst jemand, den man im Notfall anruft","You're someone people would call in an emergency","Tu es quelqu'un qu'on appellerait en cas d'urgence","Sei qualcuno che chiamerebbero in un'emergenza","Eres alguien a quien llamarían en una emergencia","Você é alguém que ligariam numa emergência","Jij bent iemand die je bij een noodgeval zou bellen","Du är någon man skulle ringa i en nödsituation","Sinut soitettaisiin hätätilanteessa","Jesteś osobą, do której dzwonią w nagłych przypadkach","Jsi někdo, koho by zavolali v nouzi","Si niekto, koho by zavolali v núdzi","Te vagy az, akit vészhelyzetben felhívnának","Ești cineva pe care l-ar suna în urgență","Ti si netko kome bi nazvali u hitnom slučaju","Ti si nekdo, ki bi ga poklicali v sili"],
+  ["Dein Auftreten macht Eindruck ohne laut zu sein","Your presence makes an impression without being loud","Ta présence fait impression sans être bruyante","La tua presenza fa impressione senza essere rumorosa","Tu presencia impresiona sin ser ruidosa","Sua presença impressiona sem ser ruidosa","Jouw aanwezigheid maakt indruk zonder luid te zijn","Din närvaro gör intryck utan att vara högljudd","Läsnäolosi tekee vaikutuksen ilman meluisuutta","Twoja obecność robi wrażenie bez hałasu","Tvá přítomnost dělá dojem bez hluku","Tvoja prítomnosť robí dojem bez hluku","A jelenléted nyomot hagy zajosság nélkül","Prezența ta impresionează fără să fie zgomotoasă","Tvoje prisustvo ostavlja dojam bez buke","Tvoja prisotnost naredi vtis brez hrupa"],
+  ["Du siehst aus wie jemand der gut küsst","You look like someone who kisses well","Tu ressembles à quelqu'un qui embrasse bien","Sembri qualcuno che bacia bene","Pareces alguien que besa bien","Você parece alguém que beija bem","Je ziet eruit als iemand die goed kust","Du ser ut som någon som kysser bra","Näytät siltä kuin suutelet hyvin","Wyglądasz jak ktoś kto dobrze całuje","Vypadáš jako někdo, kdo dobře líbá","Vyzeráš ako niekto, kto dobre bozkáva","Úgy nézel ki mint aki jól csókol","Arăți ca cineva care sărută bine","Izgledaš kao netko tko dobro ljubi","Izgledaš kot nekdo, ki dobro poljublja"],
+  ["Dein Hintern. Ja","Your butt. Yes","Tes fesses. Oui","Il tuo sedere. Sì","Tu trasero. Sí","Sua bunda. Sim","Jouw kont. Ja","Din rumpa. Ja","Sinun persuksesi. Kyllä","Twój tyłek. Tak","Tvůj zadek. Ano","Tvoj zadok. Áno","A fenéked. Igen","Fundul tău. Da","Tvoja guza. Da","Tvoja zadnjica. Ja"],
+  ["Du machst Fehler und machst weiter. Das ist stärker als es klingt","You make mistakes and keep going. That's stronger than it sounds","Tu fais des erreurs et tu continues. C'est plus fort que ça en a l'air","Fai errori e vai avanti. È più forte di quanto sembri","Cometes errores y sigues adelante. Es más fuerte de lo que parece","Você comete erros e continua. É mais forte do que parece","Je maakt fouten en gaat door. Dat is sterker dan het klinkt","Du gör misstag och fortsätter. Det är starkare än det låter","Teet virheitä ja jatkat. Se on vahvempaa kuin miltä kuulostaa","Popełniasz błędy i idziesz dalej. To silniejsze niż brzmi","Děláš chyby a pokračuješ. To je silnější, než to zní","Robíš chyby a pokračuješ. To je silnejšie, ako to znie","Hibázol és mégis mész tovább. Ez erősebb, mint hangzik","Faci greșeli și continui. E mai puternic decât sună","Griješiš i nastaviš dalje. To je jače nego što zvuči","Delaš napake in nadaljuješ. To je močneje kot zveni"],
+  ["Du bist ehrlich, auch wenn es unbequem ist","You're honest, even when it's uncomfortable","Tu es honnête, même quand c'est inconfortable","Sei onesto, anche quando è scomodo","Eres honesto, incluso cuando es incómodo","Você é honesto, mesmo quando é desconfortável","Je bent eerlijk, ook als het ongemakkelijk is","Du är ärlig, även när det är obekvämt","Olet rehellinen, vaikka se olisi epämukavaa","Jesteś szczery, nawet gdy jest to niewygodne","Jsi upřímný, i když je to nepříjemné","Si úprimný, aj keď je to nepríjemné","Őszinte vagy, még ha kényelmetlen is","Ești sincer, chiar și când e incomod","Iskren si, čak i kad je neugodno","Iskren si, tudi ko je neprijetno"],
+  ["Du hast Charme, aber keinen aufgesetzten","You have charm, but not the put-on kind","Tu as du charme, mais pas celui qu'on affiche","Hai fascino, ma non quello artificiale","Tienes encanto, pero no el fingido","Você tem charme, mas não o forçado","Je hebt charme, maar niet de nep-soort","Du har charm, men inte den konstlade sorten","Sinulla on viehätystä, mutta ei teennäistä","Masz urok, ale nie udawany","Máš šarm, ale ne naučený","Máš šarm, ale nie naučený","Van varázsod, de nem erőltetett","Ai farmec, dar nu cel artificial","Imaš šarm, ali ne onaj lažni","Imaš šarm, a ne tistega umetnega"],
+  ["Du hast eine Präsenz die man spürt bevor du redest","You fit well in this world","Tu vas bien dans ce monde","Stai bene in questo mondo","Encajas bien en este mundo","Você se encaixa bem neste mundo","Je past goed in deze wereld","Du passar bra i den här världen","Sovit hyvin tähän maailmaan","Dobrze pasujesz do tego świata","Do tohoto světa se hodíš","Do tohto sveta sa hodíš","Jól illeszkedsz ebbe a világba","Te potrivești bine în această lume","Dobro se uklapas u ovaj svijet","Dobro se ujemaš s tem svetom"],
+  ["Deine Schultern sehen aus als könnten sie was tragen","Your shoulders look like they can carry something","Tes épaules ont l'air de pouvoir porter quelque chose","Le tue spalle sembrano in grado di portare qualcosa","Tus hombros parecen capaces de cargar algo","Seus ombros parecem capazes de carregar algo","Je schouders zien eruit alsof ze iets kunnen dragen","Dina axlar ser ut att kunna bära något","Hartiasi näyttävät kestäviltä","Twoje ramiona wyglądają, jakby mogły coś unieść","Tvá ramena vypadají, jako by mohla něco nést","Tvoje ramená vyzerajú, akoby mohli niečo niesť","A vállad úgy néz ki, mintha bírna valamit","Umerii tăi arată ca pot duce ceva","Tvoja ramena izgledaju kao da mogu nositi nešto","Tvoja ramena izgledajo, kot da bi zmogla nositi"],
+  ["Du bist gut gealtert","You've aged well","Tu as bien vieilli","Sei invecchiato bene","Has envejecido bien","Você envelheceu bem","Je bent goed gerijpt","Du har åldrats väl","Olet vanhentunut hyvin","Dobrze się starzejesz","Dobře jsi zestárl","Dobre si zostarol","Jól öregedtél","Ai îmbătrânit bine","Dobro si ostario","Dobro si se postaral"],
+  ["Du lässt Leute ausreden","You let people finish their sentences","Tu laisses les gens finir leurs phrases","Lasci parlare le persone fino in fondo","Dejas a la gente terminar sus frases","Você deixa as pessoas terminarem de falar","Je laat mensen uitspreken","Du låter folk tala till punkt","Annat ihmisten puhua loppuun","Dajesz ludziom skończyć","Necháš lidi domluvit","Nechaj ľudí dohovoriť","Hagyod befejezni a mondatot","Lași oamenii să termine","Pustiš ljude da dovrše","Pustiš ljudi, da dokončajo"],
+  ["Dein Lächeln ist echt. Man sieht den Unterschied","Your smile is real. You can tell the difference","Ton sourire est sincère. On voit la différence","Il tuo sorriso è autentico. Si vede la differenza","Tu sonrisa es real. Se nota la diferencia","Seu sorriso é real. Dá para perceber a diferença","Je glimlach is echt. Je ziet het verschil","Ditt leende är äkta. Man ser skillnaden","Hymysi on aito. Eron huomaa","Twój uśmiech jest prawdziwy. Widać różnicę","Tvůj úsměv je opravdový. Je to vidět","Tvoj úsmev je skutočný. Je to vidieť","A mosolyod valódi. Látszik a különbség","Zâmbetul tău e autentic. Se vede diferența","Tvoj osmijeh je pravi. Vidi se razlika","Tvoj nasmeh je pravi. Razliko je videti"],
+  ["Du hast ein Gefühl für Timing","You have a sense of timing","Tu as le sens du timing","Hai il senso del tempismo","Tienes sentido del timing","Você tem senso de timing","Je hebt gevoel voor timing","Du har känsla för tajming","Sinulla on rytmitaju","Masz wyczucie czasu","Máš cit pro načasování","Máš cit pre načasovanie","Érzéked van az időzítéshez","Ai simț al timpului","Imaš osjećaj za timing","Imaš občutek za čas"],
+  ["Du bist jemand dem Tiere vertrauen. Das sagt was","Animals trust you. That says something","Les animaux te font confiance. Ça dit quelque chose","Gli animali si fidano di te. Dice qualcosa","Los animales confían en ti. Eso dice algo","Os animais confiam em você. Isso diz algo","Dieren vertrouwen jou. Dat zegt wat","Djur litar på dig. Det säger något","Eläimet luottavat sinuun. Se kertoo jotain","Zwierzęta ci ufają. To mówi coś","Zvířata ti důvěřují. To o něčem svědčí","Zvieratá ti dôverujú. To o niečom svedčí","Az állatok bíznak benned. Ez sokat mond","Animalele au încredere în tine. Asta spune ceva","Životinje ti vjeruju. To govori nešto","Živali ti zaupajo. To pove marsikaj"],
+  ["Deine Augenbrauen sind im Gleichgewicht","Your eyebrows are in balance","Tes sourcils sont en équilibre","Le tue sopracciglia sono in equilibrio","Tus cejas están en equilibrio","Suas sobrancelhas estão em equilíbrio","Je wenkbrauwen zijn in balans","Dina ögonbryn är i balans","Kulmakarvasi ovat tasapainossa","Twoje brwi są w równowadze","Tvoje obočí je vyvážené","Tvoje obočie je vyvážené","A szemöldököd egyensúlyban van","Sprâncenele tale sunt echilibrate","Tvoje obrve su u ravnoteži","Tvoje obrvi so uravnotežene"],
+  ["Du weißt wann du dich entschuldigen musst und tust es dann auch","You know when to apologize and you actually do it","Tu sais quand t'excuser et tu le fais vraiment","Sai quando scusarti e lo fai davvero","Sabes cuándo disculparte y lo haces de verdad","Você sabe quando se desculpar e realmente o faz","Je weet wanneer je je moet verontschuldigen en doet dat ook","Du vet när du ska be om ursäkt och gör det faktiskt","Tiedät milloin pyytää anteeksi ja teet sen oikeasti","Wiesz kiedy przeprosić i robisz to naprawdę","Víš, kdy se omluvit a skutečně to děláš","Vieš, kedy sa ospravedlniť a skutočne to robíš","Tudod, mikor kell elnézést kérni és megteszed","Știi când să-ți ceri scuze și chiar o faci","Znaš kada se ispričati i zaista to činiš","Veš, kdaj se opravičiti in to res storiš"],
+  ["Du siehst aus wie jemand der gut küsst","You have a way of asking that doesn't feel intrusive","Tu as une façon de demander qui n'est pas intrusive","Hai un modo di chiedere che non risulta invasivo","Tienes una forma de preguntar que no resulta intrusiva","Você tem um jeito de perguntar que não parece invasivo","Je hebt een manier van vragen die niet opdringerig is","Du har ett sätt att fråga som inte känns påträngande","Sinulla on tapa kysyä, joka ei tunnu tunkeilevalta","Masz sposób zadawania pytań, który nie jest natrętny","Máš způsob ptaní, který není vtíravý","Máš spôsob pýtania, ktorý nie je dotieravý","Van módod kérdezni úgy, hogy az nem tolakodó","Ai un mod de a întreba care nu pare intruziv","Imaš način postavljanja pitanja koji nije nametljiv","Imaš način postavljanja vprašanj, ki ni vsiljiv"],
+  ["Du hast eine Präsenz die man spürt bevor du redest","You have a presence people feel before you speak","Tu as une présence qu'on ressent avant que tu parles","Hai una presenza che si sente prima che tu parli","Tienes una presencia que se siente antes de que hables","Você tem uma presença que as pessoas sentem antes de você falar","Je hebt een aanwezigheid die mensen voelen voor je spreekt","Du har en närvaro folk känner innan du pratar","Sinulla on läsnäolo joka tuntuu ennen kuin puhut","Masz obecność którą ludzie czują zanim zaczniesz mówić","Máš přítomnost kterou lidé cítí dříve než mluvíš","Máš prítomnosť ktorú ľudia cítia skôr ako hovoríš","Van egy jelenléted amit az emberek éreznek mielőtt szólsz","Ai o prezență pe care oamenii o simt înainte să vorbești","Imaš prisutnost koju ljudi osjećaju prije nego što progovoriš","Imaš prisotnost ki jo ljudje čutijo preden govoriš"],
+  ["Du bist der Mensch in der Gruppe der sich Sachen merkt","You're the one in the group who remembers things","Tu es celui du groupe qui retient les choses","Sei quello del gruppo che ricorda le cose","Eres el del grupo que recuerda las cosas","Você é aquele do grupo que lembra das coisas","Jij bent degene in de groep die dingen onthoudt","Du är den i gruppen som kommer ihåg saker","Olet ryhmässä se, joka muistaa asiat","Jesteś osobą w grupie, która pamięta rzeczy","Jsi ten v skupině, kdo si věci pamatuje","Si ten v skupine, kto si veci pamätá","Te vagy a csapatban, aki emlékszik a dolgokra","Ești cel din grup care ține minte lucrurile","Ti si onaj u grupi koji pamti stvari","Ti si tisti v skupini, ki si zapomni stvari"],
+  ["Deine Haut sieht gepflegt aus","Your skin looks well cared for","Ta peau est bien entretenue","La tua pelle sembra curata","Tu piel parece bien cuidada","Sua pele parece bem cuidada","Je huid ziet er goed verzorgd uit","Din hud ser välvårdad ut","Ihosi näyttää hyvin hoidetulta","Twoja skóra wygląda na zadbana","Tvá kůže vypadá dobře ošetřená","Tvoja koža vyzerá dobre ošetrená","A bőröd ápolt","Pielea ta arată bine îngrijită","Tvoja koža izgleda dobro njgovana","Tvoja koža izgleda negovana"],
+  ["Du hast einen Sinn für Absurdität. Sehr gesund","You have a sense of absurdity. Very healthy","Tu as le sens de l'absurde. Très sain","Hai il senso dell'assurdo. Molto sano","Tienes sentido del absurdo. Muy saludable","Você tem senso do absurdo. Muito saudável","Je hebt gevoel voor het absurde. Heel gezond","Du har känsla för det absurda. Väldigt hälsosamt","Sinulla on absurdin taju. Erittäin terveellistä","Masz wyczucie absurdu. Bardzo zdrowe","Máš smysl pro absurdno. Velmi zdravé","Máš zmysel pre absurdno. Veľmi zdravé","Van érzéked az abszurdhoz. Nagyon egészséges","Ai simț pentru absurd. Foarte sănătos","Imaš osjećaj za apsurd. Jako zdravo","Imaš občutek za absurd. Zelo zdravo"],
+  ["Du bist jemand dem man die Wahrheit sagt","You're someone people tell the truth to","Tu es quelqu'un à qui on dit la vérité","Sei qualcuno a cui si dice la verità","Eres alguien a quien se le dice la verdad","Você é alguém para quem as pessoas dizem a verdade","Jij bent iemand aan wie je de waarheid vertelt","Du är någon man berättar sanningen för","Sinulle kerrotaan totuus","Jesteś kimś komu mówi się prawdę","Jsi někdo komu se říká pravda","Si niekto komu sa hovorí pravda","Te vagy az akinek az igazat mondják","Ești cineva căruia i se spune adevărul","Ti si netko kome se govori istina","Ti si nekdo ki mu povejo resnico"],
+  ["Du bist jemand bei dem man nach Jahren weitermacht als wäre nichts gewesen","You're someone people pick up with after years like nothing happened","Tu es quelqu'un avec qui on reprend après des années comme si de rien n'était","Sei qualcuno con cui si riprende dopo anni come se nulla fosse","Eres alguien con quien se retoma después de años como si nada","Você é alguém com quem se retoma depois de anos como se nada","Jij bent iemand bij wie je na jaren verder gaat alsof er niets is","Du är någon man kan fortsätta med efter år som om ingenting hänt","Sinun kanssasi jatketaan vuosien jälkeen kuin ei mitään","Jesteś osobą, przy której po latach wraca się jakby nic","Jsi někdo, s kým se po letech navazuje, jako by se nic nestalo","Si niekto, s kým sa po rokoch nadväzuje, ako keby sa nič nestalo","Te vagy az, akivel évek után is folytatni lehet, mintha mi sem történt volna","Ești cineva cu care se reia după ani ca și cum nimic nu s-a întâmplat","Ti si netko s kim se nastavlja nakon godina kao da se ništa nije desilo","Ti si nekdo, s katerim se po letih nadaljuje, kot da se nič ni zgodilo"],
+  ["Du riechst gut","You smell good","Tu sens bon","Profumi bene","Hueles bien","Você cheira bem","Je ruikt lekker","Du luktar gott","Tuoksut hyvältä","Dobrze pachniesz","Voníš dobře","Voníš dobre","Jól illatszol","Miroși bine","Lijepo mirisaš","Lepo diši"],
+  ["Du hast Geduld. Nicht endlos, aber genug","You have patience. Not endless, but enough","Tu as de la patience. Pas sans fin, mais assez","Hai pazienza. Non infinita, ma abbastanza","Tienes paciencia. No infinita, pero suficiente","Você tem paciência. Não infinita, mas suficiente","Je hebt geduld. Niet eindeloos, maar genoeg","Du har tålamod. Inte ändlöst, men tillräckligt","Sinulla on kärsivällisyyttä. Ei loputonta, mutta riittävästi","Masz cierpliwość. Nie nieskończoną, ale wystarczającą","Máš trpělivost. Ne nekonečnou, ale dost","Máš trpezlivosť. Nie nekonečnú, ale dosť","Van türelmed. Nem végtelen, de elég","Ai răbdare. Nu infinită, dar suficientă","Imaš strpljenja. Ne beskonačno, ali dovoljno","Imaš potrpežljivost. Ne neskončno, a dovolj"],
+  ["Du bist gut angezogen für das was du heute vorhast","You're dressed right for what you're doing today","Tu es bien habillé pour ce que tu fais aujourd'hui","Sei ben vestito per quello che farai oggi","Estás bien vestido para lo que harás hoy","Você está bem vestido para o que vai fazer hoje","Je bent goed gekleed voor wat je vandaag gaat doen","Du är välklädd för vad du ska göra idag","Olet pukeutunut oikein siihen mitä tänään teet","Jesteś dobrze ubrany na to, co dziś zamierzasz zrobić","Jsi dobře oblečen na to, co dnes plánuješ","Si dobre oblečený na to, čo dnes plánuješ","Jól vagy öltözve arra, amit ma tervezel","Ești îmbrăcat bine pentru ce ai de făcut azi","Dobro si obučen za ono što planiraš danas","Dobro si oblečen za to, kar načrtuješ danes"],
+  ["Du siehst aus wie jemand mit einer guten Playlist","You look like someone with a good playlist","Tu ressembles à quelqu'un avec une bonne playlist","Sembri qualcuno con una buona playlist","Pareces alguien con una buena lista de reproducción","Você parece alguém com uma boa playlist","Je ziet eruit als iemand met een goede afspeellijst","Du ser ut som någon med en bra spellista","Näytät siltä kuin sinulla olisi hyvä soittolista","Wyglądasz jak ktoś z dobrą playlistą","Vypadáš jako někdo s dobrou playlistou","Vyzeráš ako niekto s dobrou playlistou","Úgy nézel ki, mint aki jó lejátszási listával rendelkezik","Arăți ca cineva cu o playlist bună","Izgledaš kao netko s dobrom playlistom","Izgledaš kot nekdo z dobrim predvajalnikom"],
+  ["Du hast mehr Einfluss auf andere als du glaubst","You have more influence on others than you think","Tu as plus d'influence sur les autres que tu ne le crois","Hai più influenza sugli altri di quanto pensi","Tienes más influencia en los demás de lo que crees","Você tem mais influência sobre os outros do que pensa","Je hebt meer invloed op anderen dan je denkt","Du har mer inflytande på andra än du tror","Sinulla on enemmän vaikutusta muihin kuin luulet","Masz większy wpływ na innych niż myślisz","Máš větší vliv na ostatní, než si myslíš","Máš väčší vplyv na ostatných, ako si myslíš","Több hatásod van másokra, mint gondolod","Ai mai multă influență asupra altora decât crezi","Imaš više utjecaja na druge nego što misliš","Imaš večji vpliv na druge kot misliš"],
+  ["Du machst dir Sorgen um Leute. Das ist kein Fehler","You worry about people. That's not a flaw","Tu t'inquiètes pour les gens. Ce n'est pas un défaut","Ti preoccupi per le persone. Non è un difetto","Te preocupas por las personas. Eso no es un defecto","Você se preocupa com as pessoas. Isso não é um defeito","Je maakt je zorgen om mensen. Dat is geen fout","Du oroar dig för folk. Det är inget fel","Välität ihmisistä. Se ei ole heikkous","Martwisz się o ludzi. To nie jest wada","Staráš se o lidi. To není chyba","Staráš sa o ľudí. To nie je chyba","Aggódsz az emberekért. Ez nem hiba","Te îngrijorezi de oameni. Nu e un defect","Brineš se za ljude. To nije greška","Skrbiš za ljudi. To ni napaka"],
+  ["Dein Körper trägt dich. Respekt","Your body carries you. Respect","Ton corps te porte. Respect","Il tuo corpo ti porta. Rispetto","Tu cuerpo te lleva. Respeto","Seu corpo te carrega. Respeito","Je lichaam draagt je. Respect","Din kropp bär dig. Respekt","Kehosi kantaa sinut. Kunnioitus","Twoje ciało cię nosi. Szacunek","Tvoje tělo tě nese. Respekt","Tvoje telo ťa nesie. Rešpekt","A tested hordoz téged. Tisztelet","Corpul tău te poartă. Respect","Tvoje tijelo te nosi. Poštovanje","Tvoje telo te nosi. Spoštovanje"],
+  ["Du siehst gut aus wenn du müde bist","You look good when you're tired","Tu es beau même quand tu es fatigué","Sei bello anche quando sei stanco","Te ves bien incluso cuando estás cansado","Você fica bem mesmo quando está cansado","Je ziet er goed uit als je moe bent","Du ser bra ut när du är trött","Näytät hyvältä väsyneenäkin","Dobrze wyglądasz, gdy jesteś zmęczony","Vypadáš dobře, i když jsi unavený","Vyzeráš dobre, aj keď si unavený","Jól nézel ki, amikor fáradt vagy","Arăți bine chiar și când ești obosit","Izgledaš dobro čak i kad si umoran","Izgledaš dobro, tudi ko si utrujen"],
+  ["Du bist jemand der seltener Fehler macht als er denkt","You make fewer mistakes than you think","Tu fais moins d'erreurs que tu ne le crois","Fai meno errori di quanto pensi","Cometes menos errores de lo que crees","Você comete menos erros do que pensa","Je maakt minder fouten dan je denkt","Du gör färre misstag än du tror","Teet vähemmän virheitä kuin luulet","Popełniasz mniej błędów niż myślisz","Děláš méně chyb, než si myslíš","Robíš menej chýb, ako si myslíš","Kevesebb hibát csinálsz, mint gondolod","Faci mai puține greșeli decât crezi","Griješiš rjeđe nego što misliš","Delaš manj napak kot misliš"],
+  ["Du hast eine Art auf Menschen zuzugehen, die nicht aufdringlich ist","You have a way of approaching people that isn't pushy","Tu as une façon d'approcher les gens qui n'est pas envahissante","Hai un modo di avvicinarti alle persone che non è invadente","Tienes una forma de acercarte a la gente que no es intrusiva","Você tem um jeito de se aproximar das pessoas que não é invasivo","Je hebt een manier om mensen te benaderen die niet opdringerig is","Du har ett sätt att närma dig folk som inte är påträngande","Sinulla on tapa lähestyä ihmisiä, joka ei ole tungettelevaa","Masz sposób podchodzenia do ludzi, który nie jest natarczywy","Máš způsob přístupu k lidem, který není dotěrný","Máš spôsob pristupovať k ľuďom, ktorý nie je dotieravý","Van módod közeledni az emberekhez, ami nem tolakodó","Ai un mod de a te apropia de oameni care nu e agresiv","Imaš način prilaženja ljudima koji nije nametljiv","Imaš način približevanja ljudem, ki ni vsiljiv"],
+  ["Deine Stimme am Telefon klingt vertrauenswürdig","Your voice on the phone sounds trustworthy","Ta voix au téléphone inspire confiance","La tua voce al telefono trasmette fiducia","Tu voz al teléfono suena confiable","Sua voz ao telefone soa confiável","Je stem aan de telefoon klinkt betrouwbaar","Din röst i telefon låter pålitlig","Äänesi puhelimessa kuulostaa luotettavalta","Twój głos przez telefon brzmi godnie","Tvůj hlas v telefonu zní důvěryhodně","Tvoj hlas v telefóne znie dôveryhodne","A telefonhangod megbízhatónak tűnik","Vocea ta la telefon sună demn de încredere","Tvoj glas na telefonu zvuči pouzdano","Tvoj glas po telefonu zveni zaupanja vredno"],
+  ["Du hast gute Wangenknochen","You have good cheekbones","Tu as de belles pommettes","Hai buoni zigomi","Tienes buenos pómulos","Você tem boa maçã do rosto","Je hebt mooie jukbeenderen","Du har fina kindben","Sinulla on hyvät poskipäät","Masz ładne kości policzkowe","Máš hezké lícní kosti","Máš pekné lícne kosti","Szép arccsontjaid vannak","Ai pomeți frumoși","Imaš lijepe jagodice","Imaš lepe ličnice"],
+  ["Du kannst mit Stille umgehen","You can handle silence","Tu sais gérer le silence","Sai gestire il silenzio","Sabes manejar el silencio","Você sabe lidar com o silêncio","Je kunt omgaan met stilte","Du kan hantera tystnad","Osaat käsitellä hiljaisuutta","Radzisz sobie z ciszą","Umíš zvládat ticho","Vieš zvládnuť ticho","Meg tudsz birkózni a csönddel","Știi să gestionezi tăcerea","Znaš podnijeti tišinu","Znaš prenesti tišino"],
+  ["Du hast jemandem mal geholfen und nicht drüber geredet","You once helped someone and didn't talk about it","Tu as aidé quelqu'un une fois et tu n'en as pas parlé","Hai aiutato qualcuno una volta e non ne hai parlato","Ayudaste a alguien una vez y no hablaste de ello","Você ajudou alguém uma vez e não falou sobre isso","Je hebt ooit iemand geholpen en er niet over gepraat","Du hjälpte en gång någon och pratade inte om det","Autoit kerran jotakuta eikä puhunut siitä","Kiedyś pomogłeś komuś i o tym nie mówiłeś","Jednou jsi někomu pomohl a nemluvil o tom","Raz si niekomu pomohol a nehovoril o tom","Egyszer segítettél valakinek és nem szóltál róla","Ai ajutat odată pe cineva și nu ai vorbit despre asta","Jednom si nekome pomogao i nisi o tome govorio","Enkrat si nekomu pomagal in o tem nisi govoril"],
+  ["Du bist jemand den man vermisst wenn er nicht da ist","You're someone people miss when you're not around","Tu es quelqu'un qui manque quand tu n'es pas là","Sei qualcuno che manca quando non c'è","Eres alguien que se echa de menos cuando no está","Você é alguém que fazem falta quando não está","Jij bent iemand die gemist wordt als je er niet bent","Du är någon som saknas när du inte är där","Sinut kaivataan, kun et ole paikalla","Jesteś osobą, której brakuje gdy cię nie ma","Jsi někdo, koho si lidé všimnou, když chybí","Si niekto, koho ľudia chýba, keď nie si","Te vagy az, akinek hiányoznak, ha nincs itt","Ești cineva care lipsești când nu ești acolo","Ti si netko čiji je nedostatak primjetan","Ti si nekdo, ki mu manjka, ko ga ni"],
+  ["Du machst Leute ruhiger wenn du im Raum bist","You look good tired","Tu es beau même fatigué","Stai bene anche da stanco","Te ves bien cansado","Você fica bem cansado","Je ziet er goed uit als je moe bent","Du ser bra ut trött","Näytät hyvältä väsyneenä","Dobrze wyglądasz zmęczony","Dobře vypadáš unavený","Dobre vyzeráš unavený","Fáradtan is jól nézel ki","Arăți bine obosit","Izgledaš dobro umoran","Dobro izgledaš utrujen"],
+  ["Deine Handschrift sagt was über dich. Wahrscheinlich was Gutes","Your handwriting says something about you. Probably something good","Ton écriture dit quelque chose sur toi. Probablement quelque chose de bien","La tua scrittura dice qualcosa su di te. Probabilmente qualcosa di buono","Tu letra dice algo de ti. Probablemente algo bueno","Sua caligrafia diz algo sobre você. Provavelmente algo bom","Je handschrift zegt iets over jou. Waarschijnlijk iets goeds","Din handstil säger något om dig. Troligtvis något bra","Käsialasi kertoo jotain sinusta. Todennäköisesti jotain hyvää","Twoje pismo mówi coś o tobie. Prawdopodobnie coś dobrego","Tvé písmo o tobě něco říká. Pravděpodobně něco dobrého","Tvoje písmo o tebe niečo hovorí. Pravdepodobne niečo dobré","A kézírásodat mond valamit rólad. Valószínűleg valami jót","Scrisul tău spune ceva despre tine. Probabil ceva bun","Tvoj rukopis govori nešto o tebi. Vjerojatno nešto dobro","Tvoja pisava govori nekaj o tebi. Verjetno nekaj dobrega"],
+  ["Dein Lachen klingt ungeplant. Das ist das Schöne daran","Your laugh sounds unplanned. That's what's beautiful about it","Ton rire semble spontané. C'est ce qui est beau","La tua risata sembra spontanea. Questo è ciò che è bello","Tu risa suena espontánea. Eso es lo que es hermoso","Seu riso soa espontâneo. Isso é o que é bonito","Je lach klinkt spontaan. Dat is het mooie eraan","Ditt skratt låter oplanerat. Det är det vackra med det","Naurusisi kuulostaa suunnittelemattomalta. Se on siinä kaunista","Twój śmiech brzmi nieplanowanie. To w nim piękne","Tvůj smích zní neplánovaně. To je to krásné na něm","Tvoj smiech znie neplánovaní. To je to krásne na ňom","A nevetésed spontánnak hangzik. Ez a szép benne","Râsul tău sună neplanificat. Asta e frumusețea lui","Tvoj smijeh zvuči neplanirano. To je ono što je lijepo","Tvoj smeh zveni nenačrtovan. To je tisto, kar je lepo pri njem"],
+  ["Du bist der Grund warum jemand heute noch lächelt","You respect boundaries without needing them explained","Tu respectes les limites sans qu'on ait besoin de les expliquer","Rispetti i confini senza che debbano essere spiegati","Respetas los límites sin necesidad de que te los expliquen","Você respeita os limites sem que precisem ser explicados","Jij respecteert grenzen zonder dat ze uitgelegd hoeven te worden","Du respekterar gränser utan att de behöver förklaras","Kunnioitat rajoja ilman selityksiä","Szanujesz granice bez potrzeby ich wyjaśniania","Respektuješ hranice, aniž by bylo nutné je vysvětlovat","Rešpektuješ hranice, bez potreby ich vysvetľovať","Tiszteled a határokat anélkül, hogy el kellene magyarázni","Respecți limitele fără să fie nevoie să fie explicate","Poštujuješ granice bez potrebe da ih objašnjavaju","Spoštujete meje brez razlage"],
+  ["Du hast ein gutes Verhältnis zu dir selbst. Das sieht man","You have a good relationship with yourself. It shows","Tu as une bonne relation avec toi-même. Ça se voit","Hai un buon rapporto con te stesso. Si vede","Tienes una buena relación contigo mismo. Se nota","Você tem uma boa relação consigo mesmo. Dá para ver","Je hebt een goede relatie met jezelf. Dat zie je","Du har ett bra förhållande till dig själv. Det märks","Sinulla on hyvä suhde itsesi kanssa. Se näkyy","Masz dobry stosunek do siebie. Widać to","Máš dobrý vztah sám k sobě. Je to vidět","Máš dobrý vzťah sám k sebe. Je to vidieť","Jó kapcsolatod van magaddal. Ez látszik","Ai o relație bună cu tine însuți. Se vede","Imaš dobar odnos sa sobom. Vidi se","Imaš dober odnos s samim seboj. Videti je"],
+  ["Deine Art dich zu bewegen hat Rhythmus","The way you move has rhythm","Ta façon de te déplacer a du rythme","Il tuo modo di muoverti ha ritmo","Tu forma de moverte tiene ritmo","Seu jeito de se mover tem ritmo","De manier waarop je beweegt heeft ritme","Sättet du rör dig på har rytm","Tapasi liikkua on rytmikäs","Twój sposób poruszania się ma rytm","Způsob, jakým se pohybuješ, má rytmus","Spôsob, akým sa pohybuješ, má rytmus","A mozgásodat ritmus jellemzi","Modul în care te miști are ritm","Način na koji se kreće ima ritam","Način gibanja ima ritem"],
+  ["Du hast überlebt was dich hätte kleiner machen können","You survived what could have made you smaller","Tu as survécu à ce qui aurait pu te diminuer","Hai sopravvissuto a ciò che avrebbe potuto renderti più piccolo","Sobreviviste lo que podría haberte hecho más pequeño","Você sobreviveu ao que poderia ter te diminuído","Je hebt overleefd wat je kleiner had kunnen maken","Du har överlevt det som hade kunnat göra dig mindre","Olet selviytynyt siitä, mikä olisi voinut tehdä sinusta pienemmän","Przeżyłeś to, co mogło cię pomniejszyć","Přežil jsi to, co by tě mohlo zmenšit","Prežil si to, čo by ťa mohlo zmenšiť","Túlélted, ami kisebbé tehetett volna","Ai supraviețuit la ceea ce putea să te micșoreze","Preživio si ono što te je moglo umanjiti","Preživel si, kar bi te lahko zmanjšalo"],
+  ["Du bist jemand dem die Leute hinterherschauen","You're someone people turn to look at","Tu es quelqu'un que les gens regardent dans ton dos","Sei qualcuno a cui la gente si volta a guardare","Eres alguien a quien la gente mira al pasar","Você é alguém que as pessoas olham quando passa","Jij bent iemand naar wie mensen omkijken","Du är någon folk vänder sig om för att titta på","Sinulle käännetään katse","Jesteś osobą, za którą ludzie się ogladają","Jsi někdo, za kým se lidé otočí","Si niekto, za kým sa ľudia obzrú","Te vagy az, aki után az emberek fordulnak","Ești cineva după care oamenii se uită","Ti si netko za kim se ljudi okreću","Ti si nekdo, za katerim se ljudje obrnejo"],
+  ["Du gibst gute Umarmungen","You give good hugs","Tu fais de bons câlins","Sai abbracciare bene","Das buenos abrazos","Você dá bons abraços","Je geeft goede knuffels","Du ger bra kramar","Halaat hyvin","Dobrze przytulasz","Umíš obejmout","Vieš objať","Jól ölelsz","Îmbrățișezi bine","Dobro zagrliš","Dobro objameš"],
+  ["Du bist an einem Punkt in deinem Leben, auf den du stolz sein kannst","You're at a point in your life you can be proud of","Tu es à un point de ta vie dont tu peux être fier","Sei a un punto della tua vita di cui puoi essere orgoglioso","Estás en un punto de tu vida del que puedes estar orgulloso","Você está em um ponto da sua vida do qual pode se orgulhar","Je bent op een punt in je leven waar je trots op kunt zijn","Du är vid en punkt i ditt liv som du kan vara stolt över","Olet elämässäsi kohdassa, josta voit olla ylpeä","Jesteś w punkcie swojego życia, z którego możesz być dumny","Jsi v bodě svého života, na který můžeš být hrdý","Si v bode svojho života, na ktorý môžeš byť hrdý","Életed egy olyan pontján vagy, amelyre büszke lehetsz","Ești la un punct în viața ta de care poți fi mândru","Na točki si svog života na kojoj možeš biti ponosan","Stojiš na točki življenja, na katero si lahko ponosen"],
+  ["Du hast ein gutes Gesicht für schlechte Tage","You have a good face for bad days","Tu as un beau visage pour les mauvais jours","Hai un bel viso per i giorni brutti","Tienes una buena cara para los días malos","Você tem um bom rosto para dias ruins","Je hebt een goed gezicht voor slechte dagen","Du har ett bra ansikte för dåliga dagar","Sinulla on hyvät kasvot huonoille päiville","Masz dobrą twarz na złe dni","Máš dobrou tvář na špatné dny","Máš dobrú tvár na zlé dni","Jó arcod van a rossz napokhoz","Ai un chip bun pentru zilele proaste","Imaš dobro lice za loše dane","Imaš dobro lice za slabe dni"],
+  ["Du bist jemand dem man die Wahrheit sagt","You are enough. Still. Always have been","Tu es suffisant. Encore. Tu l'as toujours été","Sei abbastanza. Ancora. L'hai sempre saputo","Eres suficiente. Todavía. Siempre lo has sido","Você é suficiente. Ainda. Sempre foi","Je bent genoeg. Nog steeds. Altijd geweest","Du är tillräcklig. Fortfarande. Alltid varit","Olet riittävä. Edelleen. Olit aina","Jesteś wystarczający. Nadal. Zawsze byłeś","Jsi dost. Pořád. Vždy jsi byl","Si dosť. Stále. Vždy si bol","Elég vagy. Még mindig. Mindig is voltál","Ești suficient. Încă. Ai fost mereu","Dovoljno si. Još uvijek. Uvijek si bio","Si dovolj. Še vedno. Vedno si bil"],
+  ["Deine Nase passt perfekt zu deinem Gesicht","Your nose fits your face perfectly","Ton nez va parfaitement avec ton visage","Il tuo naso si adatta perfettamente al tuo viso","Tu nariz encaja perfectamente con tu cara","Seu nariz combina perfeitamente com seu rosto","Je neus past perfect bij je gezicht","Din näsa passar perfekt till ditt ansikte","Nenäsi sopii kasvoillesi täydellisesti","Twój nos idealnie pasuje do twarzy","Tvůj nos perfektně sedí k tvé tváři","Tvoj nos perfektne sedí k tvojej tvári","Az orrod tökéletesen illeszkedik az arcodhoz","Nasul tău se potrivește perfect cu fața ta","Tvoj nos savršeno pristaje tvom licu","Tvoj nos se popolnoma ujema z obrazom"],
+  ["Du hast überlebt was schwer war und siehst trotzdem noch so aus","You survived what was hard and still look like this","Tu as survécu à ce qui était difficile et tu ressembles encore à ça","Hai superato cose difficili e hai ancora questo aspetto","Sobreviviste lo que fue difícil y aun así sigues así","Você sobreviveu ao que foi difícil e ainda assim é assim","Je hebt overleefd wat moeilijk was en ziet er nog zo uit","Du har överlevt det som var svårt och ser fortfarande ut så här","Olet selviytynyt vaikeuksista ja näytät silti tältä","Przeżyłeś to co było trudne i nadal tak wyglądasz","Přežil jsi, co bylo těžké, a stále takto vypadáš","Prežil si, čo bolo ťažké, a stále takto vyzeráš","Túlélted, ami nehéz volt, és még mindig így nézel ki","Ai supraviețuit a ceea ce a fost greu și arăți tot așa","Preživio si što je bilo teško i još uvijek izgledaš ovako","Preživel si, kar je bilo težko, in še vedno izgledaš tako"],
+  ["Du fragst wie es jemandem geht und meinst es so","You ask how someone is and you mean it","Tu demandes comment quelqu'un va et tu le penses vraiment","Chiedi come sta qualcuno e lo intendi davvero","Preguntas cómo está alguien y lo dices en serio","Você pergunta como alguém está e realmente quer saber","Je vraagt hoe het met iemand gaat en meent het ook","Du frågar hur någon mår och menar det","Kysyt miten jollakin menee ja tarkoitat sen","Pytasz jak komuś idzie i naprawdę to masz na myśli","Ptáš se, jak se někdo má, a myslíš to vážně","Pýtaš sa, ako sa niekto má, a myslíš to vážne","Megkérdezed, hogy van valaki, és komolyan gondolod","Întrebi cum se simte cineva și chiar vrei să știi","Pitaš kako je nekome i misliš to ozbiljno","Vprašaš, kako je nekdo, in to resnično misliš"],
+  ["Deine Hände sind gut proportioniert","Your hands are well proportioned","Tes mains sont bien proportionnées","Le tue mani sono ben proporzionate","Tus manos están bien proporcionadas","Suas mãos são bem proporcionadas","Je handen zijn goed geproportioneerd","Dina händer är välproportionerade","Kätesi ovat hyvin suhteelliset","Twoje ręce są dobrze proporcjonalne","Tvoje ruce jsou dobře proporční","Tvoje ruky sú dobre proporčné","A kezeid jól arányosak","Mâinile tale sunt bine proporționate","Tvoje ruke su dobro proporcionirane","Tvoje roke so dobro sorazmerne"],
+  ["Du bist jemand, der Dinge zu Ende denkt","You're someone who thinks things through","Tu es quelqu'un qui réfléchit jusqu'au bout","Sei qualcuno che pensa le cose fino in fondo","Eres alguien que piensa las cosas hasta el final","Você é alguém que pensa as coisas até o fim","Jij bent iemand die dingen tot het einde denkt","Du är någon som tänker saker till slut","Olet joku, joka ajattelee asiat loppuun asti","Jesteś kimś, kto myśli rzeczy do końca","Jsi někdo, kdo věci domýšlí do konce","Si niekto, kto veci domýšľa do konca","Te vagy az, aki végiggondolja a dolgokat","Ești cineva care gândește lucrurile până la capăt","Ti si netko tko razmišlja do kraja","Ti si nekdo, ki stvari premisli do konca"],
+  ["Du hast keine Angst davor zu mögen was du magst","You're not afraid to like what you like","Tu n'as pas peur d'aimer ce que tu aimes","Non hai paura di apprezzare quello che ti piace","No tienes miedo de que te guste lo que te gusta","Você não tem medo de gostar do que gosta","Je bent niet bang om te houden van wat je leuk vindt","Du är inte rädd för att gilla vad du gillar","Et pelkää pitää siitä mistä pidät","Nie boisz się lubić tego, co lubisz","Nebojíš se mít rád to, co máš rád","Nebojíš sa mať rád to, čo máš rád","Nem félsz szeretni azt, amit szeretsz","Nu ți-e frică să iubești ce îți place","Nisi se bojati voljeti ono što voliš","Ne bojiš se, da ti je všeč tisto, kar ti je všeč"],
+  ["Du bist jemand, für den man sich anzieht wenn man weiß dass du kommst","You're someone people dress up for when they know you're coming","Tu es quelqu'un pour lequel on s'habille quand on sait que tu viens","Sei qualcuno per cui ci si veste quando si sa che arrivi","Eres alguien para quien la gente se viste cuando sabe que vienes","Você é alguém para quem as pessoas se arrumam quando sabem que você vem","Jij bent iemand voor wie mensen zich kleden als ze weten dat je komt","Du är någon som folk klär upp sig för när de vet att du kommer","Sinut varten pukeutuu, kun tietää sinun tulevan","Jesteś osobą, dla której ludzie się ubierają, gdy wiedzą, że przyjdziesz","Jsi někdo, pro koho se lidé oblékají, když vědí, že přijdeš","Si niekto, pre koho sa ľudia obliekajú, keď vedia, že prídeš","Te vagy az, akiről tudva felöltöznek az emberek","Ești cineva pentru care oamenii se îmbracă frumos când știu că vii","Ti si netko zbog kojeg se ljudi uređuju kad znaju da dolaziš","Ti si nekdo, za katerega se ljudje uredijo, ko vedo, da prideš"],
+  ["Dein Nacken hat was","Your neck has something","Ton cou a quelque chose","Il tuo collo ha qualcosa","Tu cuello tiene algo","Seu pescoço tem algo","Jouw nek heeft iets","Din nacke har något","Niskassasi on jotain","Twój kark ma coś","Tvůj krk má něco","Tvoj krk má niečo","A nyakadban van valami","Gâtul tău are ceva","Tvoj vrat ima nešto","Tvoj vrat ima nekaj"],
+  ["Du hast gelernt, dich nicht zu entschuldigen für das was du bist","You've learned not to apologize for what you are","Tu as appris à ne pas t'excuser pour ce que tu es","Hai imparato a non scusarti per ciò che sei","Has aprendido a no disculparte por lo que eres","Você aprendeu a não se desculpar pelo que é","Je hebt geleerd je niet te verontschuldigen voor wie je bent","Du har lärt dig att inte be om ursäkt för vad du är","Olet oppinut olemaan pahoittelematta sitä, mitä olet","Nauczyłeś się nie przepraszać za to, czym jesteś","Naučil ses neomluvit se za to, čím jsi","Naučil si sa neospravedlňovať za to, čím si","Megtanultad, hogy ne kérj bocsánatot azért, ami vagy","Ai învățat să nu te scuzi pentru ceea ce ești","Naučio si se ne ispričavati za ono što jesi","Naučil si se ne opravičevati za to, kar si"],
+  ["Du bist gut darin Stimmung zu lesen","You're good at reading the room","Tu sais lire l'ambiance","Sai leggere l'atmosfera","Sabes leer el ambiente","Você sabe ler o clima","Je bent goed in het lezen van de sfeer","Du är bra på att läsa stämningen","Olet hyvä aistimaan tunnelman","Dobrze czytasz atmosferę","Umíš číst atmosféru","Vieš čítať atmosféru","Jól érzed a hangulatot","Ești bun la citit atmosfera","Dobar si u čitanju atmosfere","Dobro bereš vzdušje"],
+  ["Du bist jemand, der Grenzen respektiert ohne dass man sie erklären muss","You respect limits without needing an explanation","Tu respectes les limites sans explication","Rispetti i limiti senza spiegazioni","Respetas los límites sin explicaciones","Você respeita os limites sem explicações","Je respecteert grenzen zonder uitleg","Du respekterar gränser utan förklaring","Kunnioitat rajoja ilman selityksiä","Szanujesz granice bez wyjaśnień","Respektuješ limity bez vysvětlení","Rešpektuješ limity bez vysvetlenia","Tiszteled a határokat magyarázat nélkül","Respecți limitele fără explicații","Poštujuješ granice bez objašnjenja","Spoštujete meje brez razlage"],
+  ["Du hast Augen die zuhören","You have eyes that listen","Tu as des yeux qui écoutent","Hai occhi che ascoltano","Tienes ojos que escuchan","Você tem olhos que ouvem","Je hebt ogen die luisteren","Du har ögon som lyssnar","Sinulla on kuuntelevat silmät","Masz oczy, które słuchają","Máš oči, které naslouchají","Máš oči, ktoré počúvajú","Olyan szemeid vannak, amelyek hallgatnak","Ai ochi care ascultă","Imaš oči koje slušaju","Imaš oči, ki poslušajo"],
+  ["Du bist der Grund warum jemand heute noch lächelt","You're the reason someone is still smiling today","Tu es la raison pour laquelle quelqu'un sourit encore aujourd'hui","Sei il motivo per cui qualcuno sta ancora sorridendo oggi","Eres la razón por la que alguien todavía sonríe hoy","Você é o motivo pelo qual alguém ainda está sorrindo hoje","Jij bent de reden waarom iemand vandaag nog lacht","Du är anledningen till att någon fortfarande ler idag","Olet syy siihen miksi joku vielä hymyilee tänään","Jesteś powodem dla którego ktoś dziś jeszcze się uśmiecha","Jsi důvod proč někdo dnes ještě usmívá","Si dôvod prečo sa niekto dnes ešte usmmieva","Te vagy az oka hogy valaki ma még mosolyog","Ești motivul pentru care cineva zâmbește încă azi","Ti si razlog zašto netko danas još uvijek osmijehuje","Ti si razlog zakaj se nekdo danes še vedno smeji"],
+  ["Du machst Leute ruhiger wenn du im Raum bist","Things get calmer when you're in the room","Les choses se calment quand tu es là","Le cose si calmano quando sei lì","Las cosas se calman cuando estás","As coisas ficam mais calmas quando você está","Dingen worden rustiger als jij er bent","Saker lugnar sig när du är där","Asiat rauhoittuvat kun olet paikalla","Rzeczy uspokajają się gdy jesteś","Věci se uklidní když jsi tam","Veci sa upokoja keď si tam","A dolgok megnyugszanak amikor ott vagy","Lucrurile se liniștesc când ești acolo","Stvari se smiruju kad si tu","Ko si tam se stvari umirijo"],
+  ["Dein Lächeln kommt zuerst","Your smile arrives first","Ton sourire arrive en premier","Il tuo sorriso arriva prima","Tu sonrisa llega primero","Seu sorriso chega primeiro","Je glimlach komt eerst","Ditt leende kommer först","Hymysi saapuu ensin","Twój uśmiech przychodzi pierwszy","Tvůj úsměv přichází první","Tvoj úsmev prichádza prvý","A mosolyod érkezik elsőnek","Zâmbetul tău vine primul","Tvoj osmijeh dolazi prvi","Tvoj nasmeh pride prvi"],
+  ["Du machst die Dinge ruhiger wenn du im Raum bist","Things get calmer when you're in the room","Les choses se calment quand tu es dans la pièce","Le cose si calmano quando sei nella stanza","Las cosas se calman cuando estás en la sala","As coisas ficam mais calmas quando você está na sala","Dingen worden rustiger als jij in de kamer bent","Saker lugnar sig när du är i rummet","Asiat rauhoittuvat kun olet huoneessa","Rzeczy uspokajają się gdy jesteś w pokoju","Věci se uklidní, když jsi v místnosti","Veci sa upokoja, keď si v miestnosti","A dolgok megnyugszanak, amikor te vagy a szobában","Lucrurile se liniștesc când ești în cameră","Stvari se smiruju kad si u prostoriji","Ko si v sobi, se stvari umirijo"],
+  ["Du bist der Grund warum jemand heute besser drauf ist","You're the reason someone is in a better mood today","Tu es la raison pour laquelle quelqu'un est de meilleure humeur aujourd'hui","Sei la ragione per cui qualcuno è di umore migliore oggi","Eres la razón por la que alguien está de mejor humor hoy","Você é a razão pela qual alguém está de melhor humor hoje","Jij bent de reden waarom iemand vandaag in een betere stemming is","Du är anledningen till att någon är på bättre humör idag","Olet syy siihen, miksi jollakin on parempi päivä","Jesteś powodem, dla którego ktoś jest dziś w lepszym nastroju","Jsi důvod, proč je někdo dnes v lepší náladě","Si dôvod, prečo je niekto dnes v lepšej nálade","Te vagy az oka, hogy valaki ma jobb hangulatban van","Ești motivul pentru care cineva e într-o dispoziție mai bună azi","Ti si razlog zašto je nekome danas bolje raspoloženje","Ti si razlog, zakaj je nekdo danes v boljšem razpoloženju"]
+];
+
+// ─── CARDS ─────────────────────────────────────────────────────────────────
+// Each card: { bg, fg, accent, layout, size, extra }
+// layout: 'titan'|'editorial'|'b'|'d'|'e3'|'e4'|'f'|'h'|'i'|'j'|'k'|'m'|'n'|'o'
+const CARDS = [
+  {bg:'#111',fg:'#fff',accent:'#ff0090',layout:'titan',caps:true},
+  {bg:'#f0ece0',fg:'#1a1a1a',accent:'#cc0000',layout:'b'},
+  {bg:'#cc0000',fg:'#fff',accent:'#fff',layout:'n',caps:true},
+  {bg:'#fff',fg:'#ff4d00',accent:'#ff4d00',layout:'o',caps:true},
+  {bg:'#ff0090',fg:'#fff',accent:'#ffe200',layout:'d',caps:true},
+  {bg:'#111',fg:'#fff',accent:'#ff4d00',layout:'e3'},
+  {bg:'#f5f0e0',fg:'#1a1a1a',accent:'#cc0000',layout:'editorial'},
+  {bg:'#ffe200',fg:'#1a1a1a',accent:'#cc0000',layout:'e4'},
+  {bg:'#ff4d00',fg:'#fff',accent:'#ffe200',layout:'k',caps:true},
+  {bg:'#111',fg:'#ff0090',accent:'#fff',layout:'titan',caps:true},
+  {bg:'#f0ece0',fg:'#1a1a1a',accent:'#ff4d00',layout:'o',caps:true},
+  {bg:'#cc0000',fg:'#fff',accent:'#fff',layout:'n',caps:true},
+  {bg:'#ff0090',fg:'#fff',accent:'#ff4d00',layout:'k',caps:true},
+  {bg:'#fff',fg:'#1a1a1a',accent:'#cc0000',layout:'editorial'},
+  {bg:'#111',fg:'#fff',accent:'#ffe200',layout:'h'},
+  {bg:'#ffe200',fg:'#1a1a1a',accent:'#1a1a1a',layout:'o',caps:true},
+  {bg:'#f5f0e0',fg:'#cc0000',accent:'#1a1a1a',layout:'b'},
+  {bg:'#ff4d00',fg:'#fff',accent:'#fff',layout:'d',caps:true},
+  {bg:'#cc0000',fg:'#fff',accent:'#fff',layout:'e4'},
+  {bg:'#111',fg:'#fff',accent:'#ff0090',layout:'n',caps:true},
+  {bg:'#fff',fg:'#ff4d00',accent:'#1a1a1a',layout:'titan',caps:true},
+  {bg:'#f0ece0',fg:'#1a1a1a',accent:'#0033cc',layout:'h'},
+  {bg:'#ff0090',fg:'#ffe200',accent:'#fff',layout:'o',caps:true},
+  {bg:'#ffe200',fg:'#0033cc',accent:'#0033cc',layout:'editorial'},
+  {bg:'#111',fg:'#ff4d00',accent:'#fff',layout:'k',caps:true},
+  {bg:'#f5f0e0',fg:'#1a1a1a',accent:'#cc0000',layout:'e4'},
+  {bg:'#cc0000',fg:'#fff',accent:'#ff4d00',layout:'d',caps:true},
+  {bg:'#ff4d00',fg:'#111',accent:'#111',layout:'n',caps:true},
+  {bg:'#fff',fg:'#cc0000',accent:'#1a1a1a',layout:'b'},
+  {bg:'#111',fg:'#ffe200',accent:'#ff0090',layout:'titan',caps:true},
+  {bg:'#f0ece0',fg:'#ff4d00',accent:'#1a1a1a',layout:'o',caps:true},
+  {bg:'#ff0090',fg:'#fff',accent:'#fff',layout:'h'},
+  {bg:'#ffe200',fg:'#1a1a1a',accent:'#cc0000',layout:'e3'},
+  {bg:'#cc0000',fg:'#fff',accent:'#ff4d00',layout:'k',caps:true},
+  {bg:'#111',fg:'#fff',accent:'#ff0090',layout:'editorial'},
+  {bg:'#f5f0e0',fg:'#cc0000',accent:'#1a1a1a',layout:'d',caps:true},
+  {bg:'#ff4d00',fg:'#fff',accent:'#ffe200',layout:'n',caps:true},
+  {bg:'#fff',fg:'#1a1a1a',accent:'#ff0090',layout:'e4'},
+  {bg:'#111',fg:'#ff0090',accent:'#fff',layout:'o',caps:true},
+  {bg:'#f0ece0',fg:'#1a1a1a',accent:'#cc0000',layout:'titan',caps:true},
+  {bg:'#cc0000',fg:'#fff',accent:'#fff',layout:'b'},
+  {bg:'#ff0090',fg:'#ff4d00',accent:'#fff',layout:'o',caps:true},
+  {bg:'#ffe200',fg:'#1a1a1a',accent:'#1a1a1a',layout:'h'},
+  {bg:'#111',fg:'#fff',accent:'#ff4d00',layout:'n',caps:true},
+  {bg:'#f5f0e0',fg:'#ff4d00',accent:'#cc0000',layout:'e3'},
+  {bg:'#ff4d00',fg:'#fff',accent:'#ffe200',layout:'editorial'},
+  {bg:'#fff',fg:'#cc0000',accent:'#1a1a1a',layout:'k',caps:true},
+  {bg:'#cc0000',fg:'#fff',accent:'#ff0090',layout:'d',caps:true},
+  {bg:'#111',fg:'#fff',accent:'#ffe200',layout:'titan',caps:true},
+  {bg:'#f0ece0',fg:'#1a1a1a',accent:'#0033cc',layout:'e4'},
+  {bg:'#ff0090',fg:'#fff',accent:'#ffe200',layout:'n',caps:true},
+  {bg:'#ffe200',fg:'#cc0000',accent:'#1a1a1a',layout:'b'},
+  {bg:'#111',fg:'#ff0090',accent:'#ff4d00',layout:'k',caps:true},
+  {bg:'#f5f0e0',fg:'#1a1a1a',accent:'#cc0000',layout:'o',caps:true},
+  {bg:'#ff4d00',fg:'#111',accent:'#fff',layout:'h'},
+  {bg:'#cc0000',fg:'#fff',accent:'#ff4d00',layout:'titan',caps:true},
+  {bg:'#fff',fg:'#ff4d00',accent:'#1a1a1a',layout:'e3'},
+  {bg:'#111',fg:'#ffe200',accent:'#fff',layout:'d',caps:true},
+  {bg:'#f0ece0',fg:'#cc0000',accent:'#1a1a1a',layout:'editorial'},
+  {bg:'#ff0090',fg:'#fff',accent:'#ff4d00',layout:'e4'},
+  {bg:'#ffe200',fg:'#1a1a1a',accent:'#cc0000',layout:'o',caps:true},
+  {bg:'#111',fg:'#fff',accent:'#ff0090',layout:'b'},
+  {bg:'#f5f0e0',fg:'#ff4d00',accent:'#cc0000',layout:'n',caps:true},
+  {bg:'#ff4d00',fg:'#fff',accent:'#ffe200',layout:'k',caps:true},
+  {bg:'#cc0000',fg:'#fff',accent:'#fff',layout:'h'},
+  {bg:'#fff',fg:'#cc0000',accent:'#1a1a1a',layout:'titan',caps:true},
+  {bg:'#111',fg:'#ff4d00',accent:'#fff',layout:'e4'},
+  {bg:'#f0ece0',fg:'#1a1a1a',accent:'#cc0000',layout:'d',caps:true},
+  {bg:'#ff0090',fg:'#fff',accent:'#ffe200',layout:'editorial'},
+  {bg:'#ffe200',fg:'#0033cc',accent:'#cc0000',layout:'o',caps:true},
+  {bg:'#111',fg:'#fff',accent:'#ff0090',layout:'k',caps:true},
+  {bg:'#f5f0e0',fg:'#cc0000',accent:'#ff4d00',layout:'titan',caps:true},
+  {bg:'#ff4d00',fg:'#fff',accent:'#fff',layout:'n',caps:true},
+  {bg:'#cc0000',fg:'#fff',accent:'#fff',layout:'e3'},
+  {bg:'#fff',fg:'#1a1a1a',accent:'#ff0090',layout:'h'},
+  {bg:'#111',fg:'#ffe200',accent:'#ff4d00',layout:'b'},
+  {bg:'#f0ece0',fg:'#ff4d00',accent:'#cc0000',layout:'k',caps:true},
+  {bg:'#ff0090',fg:'#fff',accent:'#ff4d00',layout:'d',caps:true},
+  {bg:'#ffe200',fg:'#1a1a1a',accent:'#1a1a1a',layout:'editorial'},
+  {bg:'#cc0000',fg:'#fff',accent:'#ff0090',layout:'titan',caps:true},
+  {bg:'#111',fg:'#ff0090',accent:'#ffe200',layout:'o',caps:true},
+  {bg:'#f5f0e0',fg:'#1a1a1a',accent:'#cc0000',layout:'e4'},
+  {bg:'#ff4d00',fg:'#fff',accent:'#ffe200',layout:'b'},
+  {bg:'#fff',fg:'#cc0000',accent:'#1a1a1a',layout:'n',caps:true},
+  {bg:'#111',fg:'#fff',accent:'#ff4d00',layout:'h'},
+  {bg:'#f0ece0',fg:'#cc0000',accent:'#1a1a1a',layout:'k',caps:true},
+  {bg:'#ff0090',fg:'#ffe200',accent:'#fff',layout:'titan',caps:true},
+  {bg:'#ffe200',fg:'#1a1a1a',accent:'#cc0000',layout:'d',caps:true},
+  {bg:'#cc0000',fg:'#fff',accent:'#ff4d00',layout:'e3'},
+  {bg:'#111',fg:'#fff',accent:'#ff0090',layout:'editorial'},
+  {bg:'#f5f0e0',fg:'#ff4d00',accent:'#1a1a1a',layout:'o',caps:true},
+  {bg:'#ff4d00',fg:'#111',accent:'#111',layout:'h'},
+  {bg:'#fff',fg:'#ff0090',accent:'#1a1a1a',layout:'n',caps:true},
+  {bg:'#111',fg:'#ffe200',accent:'#ff0090',layout:'k',caps:true},
+  {bg:'#f0ece0',fg:'#1a1a1a',accent:'#cc0000',layout:'titan',caps:true},
+  {bg:'#ff0090',fg:'#fff',accent:'#ff4d00',layout:'b'},
+  {bg:'#ffe200',fg:'#0033cc',accent:'#cc0000',layout:'e4'},
+  {bg:'#cc0000',fg:'#fff',accent:'#fff',layout:'d',caps:true},
+  {bg:'#111',fg:'#fff',accent:'#ff4d00',layout:'o',caps:true},,
+  {bg:'#f0ece0',fg:'#cc0000',accent:'#1a1a1a',layout:'editorial'}
+];
+
+// ─── RENDER ─────────────────────────────────────────────────────────────────
+function getCompliment(i) {
+  return C[i][lang];
+}
+
+function splitWords(text, caps) {
+  const t = caps ? text.toUpperCase() : text;
+  // split into lines of max ~12 chars
+  const words = t.split(' ');
+  const lines = [];
+  let cur = '';
+  for (const w of words) {
+    if (!cur) { cur = w; continue; }
+    if ((cur + ' ' + w).length <= 13) { cur += ' ' + w; }
+    else { lines.push(cur); cur = w; }
+  }
+  if (cur) lines.push(cur);
+  return lines;
+}
+
+function renderCard(idx, cardDef) {
+  const text = getCompliment(idx);
+  const {bg, fg, accent, layout, caps} = cardDef;
+  const stage = document.getElementById('stage');
+  stage.style.backgroundColor = bg;
+
+  const card = document.getElementById('card');
+
+  // Font size driven by text length — short = big, long = smaller, always readable
+  const len = text.length;
+  let fs;
+  if (len <= 10)       fs = 90;
+  else if (len <= 18)  fs = 76;
+  else if (len <= 28)  fs = 62;
+  else if (len <= 42)  fs = 48;
+  else if (len <= 60)  fs = 36;
+  else if (len <= 85)  fs = 26;
+  else                 fs = 20;
+
+  const lines = splitWords(text, caps);
+  // Many lines → scale down further
+  if (lines.length >= 5) fs = Math.max(fs - 8, 18);
+  if (lines.length >= 7) fs = Math.max(fs - 6, 16);
+
+  let html = '';
+
+  if (layout === 'titan') {
+    // Giant centered text
+    html = `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;padding:20px;">
+      <div style="text-align:center;">
+        ${lines.map((l,i) => `<div style="font-size:${fs}px;font-weight:900;color:${i===lines.length-1&&lines.length>1?accent:fg};line-height:0.88;letter-spacing:-0.04em;text-transform:${caps?'uppercase':'none'}">${l}</div>`).join('')}
+      </div>
+    </div>`;
+
+  } else if (layout === 'editorial') {
+    html = `<div style="width:100%;height:100%;display:flex;flex-direction:column;justify-content:flex-end;padding:clamp(24px,6vw,56px);">
+      <div style="font-size:11px;font-weight:700;letter-spacing:0.2em;color:${accent};opacity:0.6;text-transform:uppercase;margin-bottom:16px;">Für dich</div>
+      ${lines.map(l => `<div style="font-size:${fs}px;font-weight:800;color:${fg};line-height:1.05;letter-spacing:-0.02em;">${l}</div>`).join('')}
+    </div>`;
+
+  } else if (layout === 'b') {
+    html = `<div style="width:100%;height:100%;display:flex;flex-direction:column;justify-content:flex-end;padding:clamp(24px,6vw,56px);">
+      <div style="height:3px;background:${accent};width:35%;margin-bottom:20px;"></div>
+      ${lines.map(l => `<div style="font-size:${fs}px;font-weight:900;color:${fg};line-height:1.0;letter-spacing:-0.02em;text-transform:${caps?'uppercase':'none'};">${l}</div>`).join('')}
+    </div>`;
+
+  } else if (layout === 'd') {
+    // Staggered / treppe
+    html = `<div style="width:100%;height:100%;display:flex;flex-direction:column;justify-content:center;">
+      ${lines.map((l,i) => `<div style="font-size:${fs}px;font-weight:900;color:${i%2===1?accent:fg};line-height:0.9;letter-spacing:-0.03em;text-transform:${caps?'uppercase':'none'};padding-left:${i%2===0?'6vw':'18vw'};">${l}</div>`).join('')}
+    </div>`;
+
+  } else if (layout === 'e3') {
+    html = `<div style="width:100%;height:100%;display:flex;flex-direction:column;justify-content:flex-end;padding:clamp(20px,5vw,48px);">
+      ${lines.map(l => `<div style="font-size:${fs}px;font-weight:900;color:${fg};line-height:1.0;letter-spacing:-0.01em;text-transform:uppercase;">${l}</div>`).join('')}
+    </div>`;
+
+  } else if (layout === 'e4') {
+    html = `<div style="width:100%;height:100%;display:flex;flex-direction:column;justify-content:center;padding:clamp(24px,6vw,56px);">
+      ${lines.map((l,i) => `<div style="font-size:${fs}px;font-weight:${i===0?400:800};color:${i===lines.length-1?accent:fg};line-height:1.1;letter-spacing:-0.02em;">${l}</div>`).join('')}
+    </div>`;
+
+  } else if (layout === 'f') {
+    html = `<div style="width:100%;height:100%;display:flex;flex-direction:column;justify-content:flex-start;align-items:flex-end;padding:clamp(24px,6vw,56px);">
+      ${lines.map((l,i) => `<div style="font-size:${fs}px;font-weight:800;color:${i===lines.length-1?accent:fg};line-height:1.05;letter-spacing:-0.02em;text-align:right;text-transform:${caps?'uppercase':'none'};">${l}</div>`).join('')}
+    </div>`;
+
+  } else if (layout === 'h') {
+    html = `<div style="width:100%;height:100%;display:flex;align-items:flex-end;justify-content:flex-start;padding:clamp(24px,6vw,56px);">
+      <div style="max-width:75%;">
+        ${lines.map(l => `<div style="font-size:${fs}px;font-weight:400;color:${fg};line-height:1.6;letter-spacing:0.02em;">${l}</div>`).join('')}
+      </div>
+    </div>`;
+
+  } else if (layout === 'i') {
+    // Split screen
+    const mid = Math.ceil(lines.length/2);
+    const top = lines.slice(0,mid);
+    const bot = lines.slice(mid);
+    html = `<div style="width:100%;height:100%;display:grid;grid-template-rows:1fr 1fr;">
+      <div style="background:${accent};display:flex;align-items:center;justify-content:center;padding:16px;">
+        ${top.map(l => `<div style="font-size:${fs}px;font-weight:900;color:${bg};line-height:0.9;letter-spacing:-0.03em;text-transform:uppercase;text-align:center;">${l}</div>`).join('')}
+      </div>
+      <div style="display:flex;align-items:center;justify-content:center;padding:16px;">
+        ${bot.map(l => `<div style="font-size:${fs}px;font-weight:900;color:${fg};line-height:0.9;letter-spacing:-0.03em;text-transform:uppercase;text-align:center;">${l}</div>`).join('')}
+      </div>
+    </div>`;
+
+  } else if (layout === 'j') {
+    html = `<div style="width:100%;height:100%;display:flex;align-items:center;padding:clamp(20px,5vw,48px);">
+      <div style="font-size:${Math.min(fs,18)}px;font-weight:900;color:${fg};text-transform:uppercase;letter-spacing:0.18em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${lines.join(' ')}</div>
+    </div>`;
+
+  } else if (layout === 'k') {
+    html = `<div style="width:100%;height:100%;display:flex;flex-direction:column;justify-content:flex-end;padding:clamp(24px,6vw,56px);">
+      ${lines.map((l,i) => `<div style="font-size:${fs}px;font-weight:900;color:${i===lines.length-1?accent:fg};line-height:0.92;letter-spacing:-0.03em;text-transform:${caps?'uppercase':'none'};">${l}</div>`).join('')}
+    </div>`;
+
+  } else if (layout === 'm') {
+    // Massive type nearly bleeding off screen
+    html = `<div style="width:100%;height:100%;display:flex;flex-direction:column;justify-content:center;overflow:hidden;">
+      ${lines.map((l,i) => `<div style="font-size:${fs+i*4}px;font-weight:900;color:${i%2===0?fg:accent};line-height:0.82;letter-spacing:-0.06em;text-transform:uppercase;white-space:nowrap;margin-left:-2px;">${l}</div>`).join('')}
+    </div>`;
+
+  } else if (layout === 'n') {
+    // Poster – big lines + small contrast text
+    const smallText = lines.length > 2 ? lines.pop() : null;
+    html = `<div style="width:100%;height:100%;display:flex;flex-direction:column;justify-content:center;padding:8px 12px;">
+      ${lines.map((l,i) => `<div style="font-size:${fs}px;font-weight:900;color:${i===lines.length-1&&lines.length>1?accent:fg};line-height:0.86;letter-spacing:-0.05em;text-transform:uppercase;">${l}</div>`).join('')}
+      ${smallText ? `<div style="font-size:13px;font-weight:400;color:${fg};opacity:0.45;margin-top:12px;letter-spacing:0.05em;">${smallText}</div>` : ''}
+    </div>`;
+
+  } else if (layout === 'o') {
+    // Stacked words full width
+    html = `<div style="width:100%;height:100%;display:flex;flex-direction:column;justify-content:center;padding:8px 10px;">
+      ${lines.map((l,i) => `<div style="font-size:${fs}px;font-weight:900;color:${i===lines.length-1?accent:fg};line-height:0.88;letter-spacing:-0.04em;text-transform:uppercase;">${l}</div>`).join('')}
+    </div>`;
+  }
+
+  card.innerHTML = html;
+}
+
+// ─── STATE ───────────────────────────────────────────────────────────────────
+let order = [...Array(100).keys()];
+// shuffle
+for (let i = order.length-1; i>0; i--) {
+  const j = Math.floor(Math.random()*(i+1));
+  [order[i],order[j]] = [order[j],order[i]];
+}
+let pos = 0;
+let transitioning = false;
+
+function showCurrent(animate) {
+  const idx = order[pos];
+  const cardDef = CARDS[pos % CARDS.length];
+  if (!animate) {
+    renderCard(idx, cardDef);
+    return;
+  }
+  const card = document.getElementById('card');
+  card.classList.add('out');
+  setTimeout(() => {
+    renderCard(idx, cardDef);
+    card.classList.remove('out');
+    transitioning = false;
+  }, 300);
+}
+
+// Initial
+showCurrent(false);
+
+// Update counter
+function updateCounter() {
+  document.getElementById('counter').textContent = (pos+1) + ' / 100';
+}
+updateCounter();
+
+// Show hint after 2s
+setTimeout(() => document.getElementById('tap-hint').classList.add('visible'), 2000);
+setTimeout(() => document.getElementById('tap-hint').classList.remove('visible'), 5000);
+
+document.getElementById('stage').addEventListener('click', () => {
+  if (transitioning) return;
+  transitioning = true;
+  pos = (pos + 1) % 100;
+  if (pos === 0) {
+    // reshuffle
+    for (let i = order.length-1; i>0; i--) {
+      const j = Math.floor(Math.random()*(i+1));
+      [order[i],order[j]] = [order[j],order[i]];
+    }
+  }
+  updateCounter();
+  showCurrent(true);
+});
+</script>
+<script>if("serviceWorker"in navigator)navigator.serviceWorker.register("sw.js");</script>
+</body>
+</html>
